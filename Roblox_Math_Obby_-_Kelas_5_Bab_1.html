@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Roblox Math Obby - Matematika Kelas 5 Bab 1</title>
+    <!-- Tailwind CSS untuk UI yang responsif dan modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js untuk rendering 3D bergaya Roblox -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts: Fredoka & Inter untuk nuansa game Roblox yang ramah anak -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', 'Inter', sans-serif;
+            background-color: #38bdf8;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* Efek tombol bergaya Roblox 3D */
+        .roblox-btn {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25);
+        }
+        .roblox-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+        }
+        /* Glassmorphism panel ala HUD Roblox modern */
+        .roblox-panel {
+            background: rgba(20, 24, 34, 0.85);
+            backdrop-filter: blur(8px);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes floatToast {
+            0% { transform: translate(-50%, 15px); opacity: 0; }
+            20% { transform: translate(-50%, 0); opacity: 1; }
+            80% { transform: translate(-50%, 0); opacity: 1; }
+            100% { transform: translate(-50%, -15px); opacity: 0; }
+        }
+        .toast-anim {
+            animation: floatToast 1.8s ease forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas 3D Utama -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD (Heads-Up Display) Atas -->
+    <div id="hud-top" class="fixed top-0 left-0 right-0 p-3 sm:p-4 pointer-events-none flex flex-col gap-2 z-10 hidden">
+        <!-- Baris Status: Level, Skor, Timer, Audio & Kamera -->
+        <div class="flex flex-wrap items-center justify-between gap-2 max-w-5xl mx-auto w-full">
+            <!-- Info Soal & Tingkat Kesulitan -->
+            <div class="roblox-panel rounded-2xl px-3.5 py-2 flex items-center gap-3 text-white pointer-events-auto">
+                <div class="bg-blue-500 text-white font-bold px-2.5 py-1 rounded-xl text-sm sm:text-base shadow">
+                    Soal <span id="hud-level">1</span>/30
+                </div>
+                <span id="hud-difficulty" class="text-xs sm:text-sm font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                    MUDAH
+                </span>
+            </div>
+
+            <!-- Skor & Waktu -->
+            <div class="flex items-center gap-2 pointer-events-auto">
+                <div class="roblox-panel rounded-2xl px-3.5 py-2 flex items-center gap-2 text-white">
+                    <span class="text-yellow-400 text-lg">⭐</span>
+                    <span id="hud-score" class="font-bold text-base sm:text-lg text-yellow-300">0</span>
+                </div>
+                <div class="roblox-panel rounded-2xl px-3.5 py-2 flex items-center gap-2 text-white">
+                    <span class="text-sky-400 text-lg">⏱️</span>
+                    <span id="hud-timer" class="font-bold text-base sm:text-lg font-mono">00:00</span>
+                </div>
+                <!-- Tombol Suara -->
+                <button id="btn-sound" onclick="toggleSound()" class="roblox-panel roblox-btn rounded-2xl p-2.5 text-white hover:bg-slate-800 transition" title="Suara Efek">
+                    <span id="sound-icon" class="text-lg">🔊</span>
+                </button>
+                <!-- Tombol Reset Posisi (Jika tersangkut) -->
+                <button onclick="respawnAtCheckpoint()" class="roblox-panel roblox-btn rounded-2xl px-3 py-2 text-xs sm:text-sm font-bold text-amber-300 hover:bg-slate-800 transition" title="Kembali ke Pos">
+                    🔄 Pos
+                </button>
+            </div>
+        </div>
+
+        <!-- Papan Soal Matematika -->
+        <div class="max-w-3xl mx-auto w-full mt-1">
+            <div class="roblox-panel rounded-2xl p-3.5 sm:p-4 text-center border-2 border-sky-400/40 shadow-xl">
+                <div class="text-xs uppercase tracking-wider text-sky-300 font-bold mb-1" id="hud-topic">
+                    Membaca & Menulis Bilangan Cacah
+                </div>
+                <h2 id="hud-question" class="text-white text-base sm:text-xl md:text-2xl font-bold leading-snug">
+                    Memuat soal...
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-300 mt-1.5">
+                    Lompat ke pijakan <span class="text-red-400 font-bold">A</span>, <span class="text-blue-400 font-bold">B</span>, <span class="text-emerald-400 font-bold">C</span>, atau <span class="text-amber-400 font-bold">D</span> yang benar!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifikasi Umpan Balik (Benar / Salah) -->
+    <div id="feedback-toast" class="fixed top-44 left-1/2 -translate-x-1/2 z-30 pointer-events-none hidden">
+        <div id="feedback-box" class="px-6 py-3 rounded-2xl font-bold text-white text-lg sm:text-xl shadow-2xl border-2 border-white/30 text-center">
+            Benar! +100 Poin
+        </div>
+    </div>
+
+    <!-- Kontrol Sentuh (Mobile / Tablet / Layar Sentuh) -->
+    <div id="touch-controls" class="fixed bottom-4 left-4 right-4 flex justify-between items-end z-20 pointer-events-none hidden">
+        <!-- D-Pad Kiri -->
+        <div class="grid grid-cols-3 gap-1.5 w-36 h-36 pointer-events-auto opacity-85">
+            <div></div>
+            <button id="touch-up" class="roblox-btn bg-slate-800/80 border-2 border-white/30 rounded-2xl flex items-center justify-center text-white text-2xl active:bg-sky-500">▲</button>
+            <div></div>
+            <button id="touch-left" class="roblox-btn bg-slate-800/80 border-2 border-white/30 rounded-2xl flex items-center justify-center text-white text-2xl active:bg-sky-500">◀</button>
+            <div class="bg-slate-900/40 rounded-full"></div>
+            <button id="touch-right" class="roblox-btn bg-slate-800/80 border-2 border-white/30 rounded-2xl flex items-center justify-center text-white text-2xl active:bg-sky-500">▶</button>
+            <div></div>
+            <button id="touch-down" class="roblox-btn bg-slate-800/80 border-2 border-white/30 rounded-2xl flex items-center justify-center text-white text-2xl active:bg-sky-500">▼</button>
+            <div></div>
+        </div>
+
+        <!-- Tombol Lompat Kanan -->
+        <button id="touch-jump" class="roblox-btn pointer-events-auto w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-500/90 border-4 border-white/50 text-white font-extrabold text-lg shadow-xl flex flex-col items-center justify-center active:bg-emerald-400">
+            <span>LOMPAT</span>
+            <span class="text-xs font-normal">(Spasi)</span>
+        </button>
+    </div>
+
+    <!-- Layar Awal (Start Screen) -->
+    <div id="start-screen" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="roblox-panel rounded-3xl max-w-lg w-full p-6 sm:p-8 text-center text-white animate-pop border-2 border-sky-400/50">
+            <div class="inline-block bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 text-white font-extrabold text-xs uppercase tracking-widest px-3 py-1 rounded-full mb-3 shadow">
+                Kurikulum Merdeka • Kelas 5 SD
+            </div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-b from-white to-sky-200 drop-shadow">
+                ROBLOX MATH OBBY
+            </h1>
+            <p class="text-sky-300 font-bold text-base sm:text-lg mb-4">
+                Bab 1: Bilangan Cacah sampai 100.000
+            </p>
+            
+            <div class="bg-slate-800/80 rounded-2xl p-4 text-left text-sm space-y-2 mb-6 border border-white/10">
+                <p class="font-bold text-yellow-300">🎯 Misi Petualangan (30 Level):</p>
+                <ul class="list-disc list-inside text-slate-200 space-y-1 text-xs sm:text-sm">
+                    <li><span class="text-emerald-400 font-bold">Level 1–15 (Mudah):</span> Membaca, menulis & nilai tempat bilangan.</li>
+                    <li><span class="text-amber-400 font-bold">Level 16–30 (Sedang):</span> Membandingkan, mengurutkan, komposisi/dekomposisi & operasi hitung.</li>
+                    <li><span class="text-sky-400 font-bold">Kontrol:</span> Gunakan <b>WASD / Panah</b> untuk jalan & <b>Spasi</b> untuk melompat (atau tombol sentuh di layar). Geser layar/mouse untuk memutar kamera.</li>
+                </ul>
+            </div>
+
+            <button onclick="startGame()" class="roblox-btn w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-extrabold text-xl tracking-wide border-2 border-emerald-300/50 cursor-pointer">
+                ▶ MULAI PETUALANGAN
+            </button>
+        </div>
+    </div>
+
+    <!-- Layar Akhir (Scorecard / Leaderboard) -->
+    <div id="end-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md hidden">
+        <div class="roblox-panel rounded-3xl max-w-lg w-full p-6 sm:p-8 text-center text-white animate-pop border-2 border-yellow-400/60">
+            <div class="text-5xl mb-2">🏆</div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-yellow-300 mb-1">
+                OBBY SELESAI!
+            </h2>
+            <div id="final-rank" class="inline-block bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 font-extrabold px-4 py-1.5 rounded-full text-sm sm:text-base mb-5 shadow-lg">
+                Master Matematika Roblox!
+            </div>
+
+            <!-- Kartu Statistik Skor -->
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-slate-800/90 rounded-2xl p-3.5 border border-white/10">
+                    <div class="text-xs text-slate-400 uppercase font-bold">Total Skor</div>
+                    <div id="final-score" class="text-2xl sm:text-3xl font-extrabold text-yellow-400 mt-1">3000</div>
+                </div>
+                <div class="bg-slate-800/90 rounded-2xl p-3.5 border border-white/10">
+                    <div class="text-xs text-slate-400 uppercase font-bold">Waktu Selesai</div>
+                    <div id="final-time" class="text-2xl sm:text-3xl font-extrabold text-sky-400 mt-1">03:45</div>
+                </div>
+                <div class="bg-emerald-950/70 rounded-2xl p-3 border border-emerald-500/30">
+                    <div class="text-xs text-emerald-300 uppercase font-bold">Jawaban Benar</div>
+                    <div id="final-correct" class="text-xl sm:text-2xl font-extrabold text-emerald-400 mt-0.5">30 / 30</div>
+                </div>
+                <div class="bg-rose-950/70 rounded-2xl p-3 border border-rose-500/30">
+                    <div class="text-xs text-rose-300 uppercase font-bold">Kesalahan Lompat</div>
+                    <div id="final-wrong" class="text-xl sm:text-2xl font-extrabold text-rose-400 mt-0.5">0</div>
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="roblox-btn w-full py-4 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-extrabold text-lg sm:text-xl border-2 border-sky-300/50 cursor-pointer">
+                🔄 MAIN LAGI
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // 1. BANK SOAL: 30 SOAL BAB 1 MATEMATIKA KELAS 5 KURIKULUM MERDEKA
+        // Bilangan Cacah sampai 100.000 (1-15 Mudah, 16-30 Sedang)
+        // ============================================================================
+        const QUESTIONS = [
+            // --- LEVEL 1 - 15: MUDAH (Membaca, Menulis & Nilai Tempat Bilangan) ---
+            {
+                level: 1, diff: "MUDAH", topic: "Membaca Bilangan",
+                q: "Bilangan 24.500 dibaca ...",
+                options: ["Dua puluh empat ribu lima ratus", "Dua ribu empat ratus lima puluh", "Dua puluh empat ribu lima puluh", "Dua ratus empat puluh lima ribu"],
+                correct: 0
+            },
+            {
+                level: 2, diff: "MUDAH", topic: "Menulis Bilangan",
+                q: "Lambang bilangan dari 'lima puluh tiga ribu dua ratus sepuluh' adalah ...",
+                options: ["53.021", "53.210", "50.321", "53.201"],
+                correct: 1
+            },
+            {
+                level: 3, diff: "MUDAH", topic: "Nilai Tempat",
+                q: "Pada bilangan 67.890, angka 6 menempati nilai tempat ...",
+                options: ["Ribuan", "Ratusan", "Puluh ribuan", "Puluhan"],
+                correct: 2
+            },
+            {
+                level: 4, diff: "MUDAH", topic: "Nilai Angka",
+                q: "Nilai angka 4 pada bilangan 34.912 adalah ...",
+                options: ["40.000", "400", "40", "4.000"],
+                correct: 3
+            },
+            {
+                level: 5, diff: "MUDAH", topic: "Membaca Bilangan",
+                q: "Harga sebuah buku paket adalah Rp 45.750. Bilangan 45.750 dibaca ...",
+                options: ["Empat puluh lima ribu tujuh ratus lima puluh", "Empat puluh lima ribu tujuh puluh lima", "Empat ribu lima ratus tujuh puluh lima", "Empat puluh lima ribu lima ratus tujuh puluh"],
+                correct: 0
+            },
+            {
+                level: 6, diff: "MUDAH", topic: "Menulis Bilangan",
+                q: "Lambang bilangan 'delapan puluh ribu enam ratus empat' adalah ...",
+                options: ["80.640", "80.604", "86.004", "80.064"],
+                correct: 1
+            },
+            {
+                level: 7, diff: "MUDAH", topic: "Nilai Tempat",
+                q: "Angka yang menempati nilai tempat ratusan pada bilangan 91.345 adalah ...",
+                options: ["9", "1", "3", "4"],
+                correct: 2
+            },
+            {
+                level: 8, diff: "MUDAH", topic: "Nilai Tempat",
+                q: "Pada bilangan 72.058, angka 0 menempati nilai tempat ...",
+                options: ["Puluh ribuan", "Ribuan", "Puluhan", "Ratusan"],
+                correct: 3
+            },
+            {
+                level: 9, diff: "MUDAH", topic: "Membaca Bilangan",
+                q: "Jarak kota A ke kota B adalah 60.400 meter. Bilangan 60.400 dibaca ...",
+                options: ["Enam puluh ribu empat ratus", "Enam ribu empat ratus", "Enam puluh empat ribu", "Enam puluh ribu empat puluh"],
+                correct: 0
+            },
+            {
+                level: 10, diff: "MUDAH", topic: "Menulis Bilangan",
+                q: "Tuliskan lambang bilangan: 'sembilan puluh sembilan ribu sembilan puluh'!",
+                options: ["99.900", "99.090", "99.009", "90.990"],
+                correct: 1
+            },
+            {
+                level: 11, diff: "MUDAH", topic: "Nilai Angka",
+                q: "Selisih nilai angka 8 dan 2 pada bilangan 81.200 adalah ...",
+                options: ["79.000", "78.800", "79.800", "80.200"],
+                correct: 2
+            },
+            {
+                level: 12, diff: "MUDAH", topic: "Nilai Tempat",
+                q: "Bilangan yang memiliki angka 5 pada nilai ribuan dan 7 pada puluhan adalah ...",
+                options: ["52.170", "12.570", "27.150", "35.471"],
+                correct: 3
+            },
+            {
+                level: 13, diff: "MUDAH", topic: "Membaca Bilangan",
+                q: "Bilangan 100.000 dibaca ...",
+                options: ["Seratus ribu", "Sepuluh ribu", "Satu juta", "Seribu ratus"],
+                correct: 0
+            },
+            {
+                level: 14, diff: "MUDAH", topic: "Menulis Bilangan",
+                q: "Tujuh puluh satu ribu tiga ratus dua puluh lima ditulis ...",
+                options: ["71.235", "71.325", "73.125", "71.352"],
+                correct: 1
+            },
+            {
+                level: 15, diff: "MUDAH", topic: "Nilai Angka",
+                q: "Pada bilangan 48.629, nilai angka 6 adalah ...",
+                options: ["60.000", "6.000", "600", "60"],
+                correct: 2
+            },
+
+            // --- LEVEL 16 - 30: SEDANG (Membandingkan, Mengurutkan, Komposisi, Dekomposisi & Operasi Hitung) ---
+            {
+                level: 16, diff: "SEDANG", topic: "Membandingkan Bilangan",
+                q: "Tanda perbandingan yang tepat untuk 54.320 ... 54.230 adalah ...",
+                options: ["<", "=", "≤", ">"],
+                correct: 3
+            },
+            {
+                level: 17, diff: "SEDANG", topic: "Membandingkan Bilangan",
+                q: "Manakah bilangan berikut yang nilainya PALING BESAR?",
+                options: ["76.540", "76.450", "75.999", "67.900"],
+                correct: 0
+            },
+            {
+                level: 18, diff: "SEDANG", topic: "Mengurutkan Bilangan",
+                q: "Urutan bilangan dari yang TERKECIL: 32.500, 31.900, 32.100 adalah ...",
+                options: ["32.500, 32.100, 31.900", "31.900, 32.100, 32.500", "31.900, 32.500, 32.100", "32.100, 31.900, 32.500"],
+                correct: 1
+            },
+            {
+                level: 19, diff: "SEDANG", topic: "Komposisi Bilangan",
+                q: "Komposisi dari 40.000 + 5.000 + 300 + 20 + 8 adalah ...",
+                options: ["45.382", "43.528", "45.328", "45.238"],
+                correct: 2
+            },
+            {
+                level: 20, diff: "SEDANG", topic: "Dekomposisi Bilangan",
+                q: "Bentuk dekomposisi yang benar untuk bilangan 62.405 adalah ...",
+                options: ["60.000 + 2.000 + 400 + 50", "60.000 + 200 + 40 + 5", "6.000 + 200 + 40 + 5", "60.000 + 2.000 + 400 + 5"],
+                correct: 3
+            },
+            {
+                level: 21, diff: "SEDANG", topic: "Komposisi Bilangan",
+                q: "7 puluh ribuan + 8 ribuan + 9 puluhan + 3 satuan = ...",
+                options: ["78.093", "78.903", "78.930", "70.893"],
+                correct: 0
+            },
+            {
+                level: 22, diff: "SEDANG", topic: "Penjumlahan Cacah",
+                q: "Hasil dari 34.250 + 15.400 adalah ...",
+                options: ["49.550", "49.650", "48.650", "50.650"],
+                correct: 1
+            },
+            {
+                level: 23, diff: "SEDANG", topic: "Pengurangan Cacah",
+                q: "Hasil dari 65.800 - 23.500 adalah ...",
+                options: ["41.300", "43.300", "42.300", "42.200"],
+                correct: 2
+            },
+            {
+                level: 24, diff: "SEDANG", topic: "Soal Cerita Penjumlahan",
+                q: "Ibu membeli baju Rp 45.000 dan tas Rp 32.500. Total belanja Ibu adalah ...",
+                options: ["Rp 76.500", "Rp 78.500", "Rp 87.500", "Rp 77.500"],
+                correct: 3
+            },
+            {
+                level: 25, diff: "SEDANG", topic: "Soal Cerita Pengurangan",
+                q: "Rani membawa uang Rp 50.000. Ia membeli buku seharga Rp 27.500. Sisa uang Rani adalah ...",
+                options: ["Rp 22.500", "Rp 23.500", "Rp 27.500", "Rp 32.500"],
+                correct: 0
+            },
+            {
+                level: 26, diff: "SEDANG", topic: "Perkalian Bilangan",
+                q: "Hasil dari 12.500 × 4 adalah ...",
+                options: ["48.000", "50.000", "52.000", "45.000"],
+                correct: 1
+            },
+            {
+                level: 27, diff: "SEDANG", topic: "Pembagian Bilangan",
+                q: "Hasil dari 84.000 : 4 adalah ...",
+                options: ["20.100", "24.000", "21.000", "22.000"],
+                correct: 2
+            },
+            {
+                level: 28, diff: "SEDANG", topic: "Mengurutkan Bilangan",
+                q: "Urutan dari TERBESAR: 88.120, 88.210, 88.090 adalah ...",
+                options: ["88.090, 88.120, 88.210", "88.120, 88.210, 88.090", "88.210, 88.090, 88.120", "88.210, 88.120, 88.090"],
+                correct: 3
+            },
+            {
+                level: 29, diff: "SEDANG", topic: "Operasi Campuran",
+                q: "Hasil dari 40.000 + 25.000 - 15.500 adalah ...",
+                options: ["49.500", "50.500", "48.500", "59.500"],
+                correct: 0
+            },
+            {
+                level: 30, diff: "SEDANG", topic: "Tantangan Akhir Bab 1",
+                q: "Budi punya 3 lembar Rp 20.000 dan 2 lembar Rp 10.000. Total uang Budi adalah ...",
+                options: ["Rp 70.000", "Rp 80.000", "Rp 90.000", "Rp 60.000"],
+                correct: 1
+            }
+        ];
+
+        // ============================================================================
+        // 2. SISTEM EFEK SUARA (WEB AUDIO API - TANPA URL EKSTERNAL)
+        // ============================================================================
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'jump') {
+                    // Suara lompat klasik Roblox ("boing" ringan)
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(260, now);
+                    osc.frequency.exponentialRampToValueAtTime(540, now + 0.16);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+                    osc.start(now);
+                    osc.stop(now + 0.16);
+                } else if (type === 'correct') {
+                    // Nada ceria naik (C5 - E5 - G5)
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.09);
+                    osc.frequency.setValueAtTime(783.99, now + 0.18);
+                    gain.gain.setValueAtTime(0.22, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'wrong') {
+                    // Suara "oof" / buzzer rendah saat salah platform
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(190, now);
+                    osc.frequency.linearRampToValueAtTime(110, now + 0.28);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'win') {
+                    // Fanfare kemenangan akhir level 30
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.type = 'triangle';
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.frequency.setValueAtTime(freq, now + idx * 0.12);
+                        g.gain.setValueAtTime(0.22, now + idx * 0.12);
+                        g.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.12 + 0.35);
+                        o.start(now + idx * 0.12);
+                        o.stop(now + idx * 0.12 + 0.35);
+                    });
+                }
+            } catch (e) {
+                // Abaikan jika browser memblokir audio sebelum interaksi
+            }
+        }
+
+        // ============================================================================
+        // 3. INISIALISASI SCENE 3D THREE.JS (GAYA ROBLOX OBBY)
+        // ============================================================================
+        const canvas = document.getElementById('game-canvas');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x56ccf2); // Langit biru cerah Roblox
+        scene.fog = new THREE.FogExp2(0x56ccf2, 0.0085);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 250);
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // Pencahayaan Matahari & Ambient
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x3b82f6, 0.75);
+        hemiLight.position.set(0, 50, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.85);
+        dirLight.position.set(25, 50, 25);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 5;
+        dirLight.shadow.camera.far = 150;
+        const d = 35;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // ============================================================================
+        // 4. TEKSTUR STUD ROBLOX & TEKS JAWABAN (CANVAS TEXTURE)
+        // ============================================================================
+        function createStudTexture(hexColor) {
+            const c = document.createElement('canvas');
+            c.width = 128;
+            c.height = 128;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = hexColor;
+            ctx.fillRect(0, 0, 128, 128);
+
+            // Garis tepi blok
+            ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0, 0, 128, 128);
+
+            // Tonjolan Stud khas Roblox (2x2 per tile)
+            const positions = [[32, 32], [96, 32], [32, 96], [96, 96]];
+            positions.forEach(([x, y]) => {
+                ctx.beginPath();
+                ctx.arc(x, y, 18, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.16)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                ctx.stroke();
+            });
+
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        // Membuat tekstur platform pilihan jawaban (Huruf A/B/C/D + Teks Jawaban jelas)
+        function createOptionTileTexture(letter, text, bgColor) {
+            const c = document.createElement('canvas');
+            c.width = 512;
+            c.height = 512;
+            const ctx = c.getContext('2d');
+
+            // Latar warna cerah
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, 512, 512);
+
+            // Bingkai putih tebal ala blok Roblox
+            ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+            ctx.lineWidth = 18;
+            ctx.strokeRect(14, 14, 484, 484);
+
+            // Lencana Huruf (A, B, C, D) di bagian atas
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.beginPath();
+            ctx.roundRect(186, 36, 140, 96, 24);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 72px Fredoka, Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(letter, 256, 86);
+
+            // Teks Jawaban (Word wrap otomatis agar mudah dibaca dari sudut kamera)
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetY = 3;
+
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = '';
+
+            // Tentukan ukuran font berdasarkan panjang teks
+            let fontSize = text.length > 28 ? 34 : (text.length > 16 ? 42 : 52);
+            ctx.font = `bold ${fontSize}px Fredoka, Inter, sans-serif`;
+
+            for (let i = 0; i < words.length; i++) {
+                const testLine = currentLine + words[i] + ' ';
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > 430 && i > 0) {
+                    lines.push(currentLine.trim());
+                    currentLine = words[i] + ' ';
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            lines.push(currentLine.trim());
+
+            const lineHeight = fontSize * 1.25;
+            const startY = 310 - ((lines.length - 1) * lineHeight) / 2;
+
+            lines.forEach((line, idx) => {
+                ctx.fillText(line, 256, startY + idx * lineHeight);
+            });
+
+            const tex = new THREE.CanvasTexture(c);
+            return tex;
+        }
+
+        // ============================================================================
+        // 5. KARAKTER AVATAR KOTAK-KOTAK ROBLOX (NOOB / ADVENTURER)
+        // ============================================================================
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+
+        // Material klasik Roblox Noob (Kepala kuning, baju biru, celana hijau)
+        const matHead = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
+        const matTorso = new THREE.MeshLambertMaterial({ color: 0x2563eb });
+        const matLimb = new THREE.MeshLambertMaterial({ color: 0x16a34a });
+        const matArm = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
+
+        // Kaki Kiri & Kanan
+        const legGeo = new THREE.BoxGeometry(0.45, 0.9, 0.45);
+        const leftLeg = new THREE.Mesh(legGeo, matLimb);
+        leftLeg.position.set(-0.25, 0.45, 0);
+        leftLeg.castShadow = true;
+        playerGroup.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(legGeo, matLimb);
+        rightLeg.position.set(0.25, 0.45, 0);
+        rightLeg.castShadow = true;
+        playerGroup.add(rightLeg);
+
+        // Badan (Torso)
+        const torsoGeo = new THREE.BoxGeometry(1.0, 1.0, 0.5);
+        const torso = new THREE.Mesh(torsoGeo, matTorso);
+        torso.position.set(0, 1.4, 0);
+        torso.castShadow = true;
+        playerGroup.add(torso);
+
+        // Tangan Kiri & Kanan
+        const armGeo = new THREE.BoxGeometry(0.4, 0.95, 0.45);
+        const leftArm = new THREE.Mesh(armGeo, matArm);
+        leftArm.position.set(-0.75, 1.4, 0);
+        leftArm.castShadow = true;
+        playerGroup.add(leftArm);
+
+        const rightArm = new THREE.Mesh(armGeo, matArm);
+        rightArm.position.set(0.75, 1.4, 0);
+        rightArm.castShadow = true;
+        playerGroup.add(rightArm);
+
+        // Kepala & Wajah Tersenyum Roblox
+        const headCanvas = document.createElement('canvas');
+        headCanvas.width = 128;
+        headCanvas.height = 128;
+        const hCtx = headCanvas.getContext('2d');
+        hCtx.fillStyle = '#facc15';
+        hCtx.fillRect(0, 0, 128, 128);
+        // Mata
+        hCtx.fillStyle = '#1e293b';
+        hCtx.beginPath();
+        hCtx.arc(44, 52, 8, 0, Math.PI * 2);
+        hCtx.arc(84, 52, 8, 0, Math.PI * 2);
+        hCtx.fill();
+        // Senyum klasik
+        hCtx.strokeStyle = '#1e293b';
+        hCtx.lineWidth = 6;
+        hCtx.lineCap = 'round';
+        hCtx.beginPath();
+        hCtx.arc(64, 66, 22, 0.15 * Math.PI, 0.85 * Math.PI);
+        hCtx.stroke();
+
+        const faceTex = new THREE.CanvasTexture(headCanvas);
+        const headMaterials = [
+            matHead, matHead, matHead, matHead,
+            matHead, // depan (-Z adalah arah hadap maju kita)
+            new THREE.MeshLambertMaterial({ map: faceTex })
+        ];
+        // Kita orientasikan wajah menghadap -Z (arah maju obby)
+        const headMaterialsForward = [
+            matHead, matHead, matHead, matHead,
+            new THREE.MeshLambertMaterial({ map: faceTex }), // +Z
+            matHead // -Z
+        ];
+        const headGeo = new THREE.BoxGeometry(0.75, 0.75, 0.75);
+        const head = new THREE.Mesh(headGeo, headMaterialsForward);
+        head.position.set(0, 2.32, 0);
+        head.castShadow = true;
+        playerGroup.add(head);
+
+        // ============================================================================
+        // 6. PEMBANGUNAN ARENA OBBY 3D & PLATFORM JAWABAN
+        // ============================================================================
+        const LEVEL_SPACING = 24; // Jarak antar pos soal sepanjang sumbu -Z
+        let platforms = [];       // Semua kotak pijakan untuk deteksi tabrakan
+        let optionTiles = [];     // Platform A, B, C, D untuk level aktif
+        let bridgeBlocks = [];    // Jembatan penghubung yang muncul saat benar
+        let particles = [];       // Efek partikel konfeti / pecahan
+        let decorClouds = [];     // Awan hiasan di langit
+
+        // Warna cerah khas Roblox untuk checkpoint & jembatan
+        const CHECKPOINT_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+        const OPTION_STYLES = [
+            { letter: 'A', color: '#ef4444', x: -6.3 }, // Merah
+            { letter: 'B', color: '#3b82f6', x: -2.1 }, // Biru
+            { letter: 'C', color: '#10b981', x: 2.1 },  // Hijau
+            { letter: 'D', color: '#f59e0b', x: 6.3 }   // Kuning/Oranye
+        ];
+
+        // Buat dekorasi awan kotak-kotak di langit
+        function createClouds() {
+            const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+            const cloudGeo = new THREE.BoxGeometry(8, 2.2, 5);
+            for (let i = 0; i < 35; i++) {
+                const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+                cloud.position.set(
+                    (Math.random() - 0.5) * 140,
+                    14 + Math.random() * 16,
+                    -i * 22 + 20
+                );
+                scene.add(cloud);
+                decorClouds.push(cloud);
+            }
+        }
+        createClouds();
+
+        // Buat garis kilatan / tanda checkpoint di atas platform pos
+        function createCheckpointPad(x, y, z, colorHex, isFinish = false) {
+            const width = isFinish ? 14 : 11;
+            const depth = isFinish ? 10 : 7;
+            const geo = new THREE.BoxGeometry(width, 1.2, depth);
+            const tex = createStudTexture(colorHex);
+            tex.repeat.set(width / 2, depth / 2);
+            const mat = new THREE.MeshLambertMaterial({ map: tex });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y - 0.6, z);
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            // Pad spawn putih/emas di tengah pos
+            const padGeo = new THREE.BoxGeometry(3.2, 0.15, 3.2);
+            const padMat = new THREE.MeshLambertMaterial({ color: isFinish ? 0xfacc15 : 0xffffff });
+            const pad = new THREE.Mesh(padGeo, padMat);
+            pad.position.set(x, y + 0.05, z);
+            pad.receiveShadow = true;
+            scene.add(pad);
+
+            platforms.push({
+                mesh: mesh,
+                minX: x - width / 2,
+                maxX: x + width / 2,
+                topY: y,
+                bottomY: y - 1.2,
+                minZ: z - depth / 2,
+                maxZ: z + depth / 2,
+                type: 'checkpoint'
+            });
+        }
+
+        // Bangun semua 30 pos checkpoint + panggung finish
+        function buildCourseBase() {
+            // Hapus objek lama jika restart
+            platforms.forEach(p => scene.remove(p.mesh));
+            optionTiles.forEach(o => scene.remove(o.mesh));
+            bridgeBlocks.forEach(b => scene.remove(b.mesh));
+            platforms = [];
+            optionTiles = [];
+            bridgeBlocks = [];
+
+            for (let i = 0; i < QUESTIONS.length; i++) {
+                const zPos = -i * LEVEL_SPACING;
+                const color = CHECKPOINT_COLORS[i % CHECKPOINT_COLORS.length];
+                createCheckpointPad(0, 0, zPos, color, false);
+            }
+            // Panggung Finish setelah Soal ke-30
+            const finishZ = -QUESTIONS.length * LEVEL_SPACING;
+            createCheckpointPad(0, 0, finishZ, '#eab308', true);
+
+            // Gapura Kemenangan di Finish
+            const archMat = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
+            const pillarGeo = new THREE.BoxGeometry(1, 7, 1);
+            const pLeft = new THREE.Mesh(pillarGeo, archMat);
+            pLeft.position.set(-5, 3.5, finishZ);
+            const pRight = new THREE.Mesh(pillarGeo, archMat);
+            pRight.position.set(5, 3.5, finishZ);
+            const topBeam = new THREE.Mesh(new THREE.BoxGeometry(11.5, 1.4, 1.2), archMat);
+            topBeam.position.set(0, 7, finishZ);
+            scene.add(pLeft, pRight, topBeam);
+        }
+
+        // Munculkan 4 Platform Pilihan Jawaban (A, B, C, D) untuk level saat ini
+        function spawnLevelOptions(levelIndex) {
+            // Bersihkan opsi level sebelumnya dari array tabrakan aktif
+            optionTiles.forEach(opt => {
+                scene.remove(opt.mesh);
+                platforms = platforms.filter(p => p !== opt);
+            });
+            optionTiles = [];
+
+            if (levelIndex >= QUESTIONS.length) return;
+
+            const qData = QUESTIONS[levelIndex];
+            const baseZ = -levelIndex * LEVEL_SPACING;
+            const optionZ = baseZ - 9.2; // Jarak lompat dari pos checkpoint ke platform A/B/C/D
+
+            OPTION_STYLES.forEach((style, idx) => {
+                const w = 3.7;
+                const h = 1.0;
+                const d = 4.6;
+                const geo = new THREE.BoxGeometry(w, h, d);
+
+                const topTex = createOptionTileTexture(style.letter, qData.options[idx], style.color);
+                const sideMat = new THREE.MeshLambertMaterial({ color: style.color });
+                const topMat = new THREE.MeshLambertMaterial({ map: topTex });
+
+                // Face index 2 pada BoxGeometry Three.js adalah sisi ATAS (+Y)
+                const materials = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+                const mesh = new THREE.Mesh(geo, materials);
+                mesh.position.set(style.x, -0.5, optionZ);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+
+                const tileObj = {
+                    mesh: mesh,
+                    minX: style.x - w / 2,
+                    maxX: style.x + w / 2,
+                    topY: 0,
+                    bottomY: -h,
+                    minZ: optionZ - d / 2,
+                    maxZ: optionZ + d / 2,
+                    type: 'option',
+                    optionIndex: idx,
+                    isCorrect: idx === qData.correct,
+                    triggered: false,
+                    falling: false,
+                    fallVel: 0
+                };
+
+                optionTiles.push(tileObj);
+                platforms.push(tileObj);
+            });
+        }
+
+        // Bangun Jembatan Pelangi menuju Pos Berikutnya saat pemain memilih jawaban BENAR
+        function spawnBridgeToNext(levelIndex, chosenX) {
+            const baseZ = -levelIndex * LEVEL_SPACING;
+            const startZ = baseZ - 11.8;
+            const endZ = -(levelIndex + 1) * LEVEL_SPACING + 3.5;
+            const length = Math.abs(endZ - startZ);
+            const midZ = (startZ + endZ) / 2;
+
+            // Buat 3 segmen jembatan warna-warni dari platform jawaban ke pos berikutnya
+            const segments = 3;
+            const segLen = length / segments;
+            const rainbow = ['#38bdf8', '#34d399', '#facc15'];
+
+            for (let s = 0; s < segments; s++) {
+                const t = (s + 0.5) / segments;
+                const segX = chosenX * (1 - t); // Perlahan mengarah ke tengah (X = 0)
+                const segZ = startZ - (s + 0.5) * segLen;
+
+                const geo = new THREE.BoxGeometry(3.4, 0.8, segLen + 0.2);
+                const tex = createStudTexture(rainbow[s % rainbow.length]);
+                const mat = new THREE.MeshLambertMaterial({ map: tex });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(segX, -0.4, segZ);
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+
+                const bObj = {
+                    mesh: mesh,
+                    minX: segX - 1.7,
+                    maxX: segX + 1.7,
+                    topY: 0,
+                    bottomY: -0.8,
+                    minZ: segZ - (segLen + 0.2) / 2,
+                    maxZ: segZ + (segLen + 0.2) / 2,
+                    type: 'bridge'
+                };
+                bridgeBlocks.push(bObj);
+                platforms.push(bObj);
+            }
+        }
+
+        // Efek ledakan partikel 3D saat benar atau salah
+        function spawnParticles(x, y, z, colorHex, count = 24) {
+            const geo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            for (let i = 0; i < count; i++) {
+                const p = new THREE.Mesh(geo, mat);
+                p.position.set(x, y + 0.5, z);
+                scene.add(p);
+                particles.push({
+                    mesh: p,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: Math.random() * 8 + 3,
+                    vz: (Math.random() - 0.5) * 10,
+                    life: 1.0
+                });
+            }
+        }
+
+        // ============================================================================
+        // 7. STATE PERMAINAN, FISIKA PEMAIN & KONTROL
+        // ============================================================================
+        let gameState = 'START'; // START, PLAYING, FINISHED
+        let currentLevel = 0;
+        let levelAnswered = false;
+        let score = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+        let elapsedSeconds = 0;
+        let timerInterval = null;
+
+        // Fisika Karakter
+        const player = {
+            pos: new THREE.Vector3(0, 0.2, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            speed: 10.5,
+            jumpForce: 13.5,
+            gravity: -34,
+            onGround: false,
+            rotY: Math.PI, // Menghadap -Z
+            walkCycle: 0
+        };
+
+        // Input Keyboard & Touch
+        const keys = { up: false, down: false, left: false, right: false, jump: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.up = true;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = true;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'Space') {
+                if (gameState === 'PLAYING' && player.onGround) {
+                    player.vel.y = player.jumpForce;
+                    player.onGround = false;
+                    playSound('jump');
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.up = false;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = false;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+        });
+
+        // Hubungkan Tombol Sentuh di Layar
+        function bindTouchButton(id, keyName) {
+            const btn = document.getElementById(id);
+            const start = (e) => { e.preventDefault(); keys[keyName] = true; };
+            const end = (e) => { e.preventDefault(); keys[keyName] = false; };
+            btn.addEventListener('touchstart', start, { passive: false });
+            btn.addEventListener('touchend', end, { passive: false });
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', end);
+            btn.addEventListener('mouseleave', end);
+        }
+        bindTouchButton('touch-up', 'up');
+        bindTouchButton('touch-down', 'down');
+        bindTouchButton('touch-left', 'left');
+        bindTouchButton('touch-right', 'right');
+
+        const jumpBtn = document.getElementById('touch-jump');
+        const triggerJump = (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING' && player.onGround) {
+                player.vel.y = player.jumpForce;
+                player.onGround = false;
+                playSound('jump');
+            }
+        };
+        jumpBtn.addEventListener('touchstart', triggerJump, { passive: false });
+        jumpBtn.addEventListener('mousedown', triggerJump);
+
+        // Kontrol Rotasi Kamera Orbit Ringan dengan Mouse / Geser Layar
+        let camYaw = 0;
+        let camPitch = 0.42;
+        let isDraggingCam = false;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDraggingCam = true;
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+        });
+        window.addEventListener('mouseup', () => { isDraggingCam = false; });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingCam) return;
+            const dx = e.clientX - lastPointerX;
+            const dy = e.clientY - lastPointerY;
+            camYaw -= dx * 0.006;
+            camPitch = Math.max(0.15, Math.min(1.05, camPitch + dy * 0.006));
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDraggingCam = true;
+                lastPointerX = e.touches[0].clientX;
+                lastPointerY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDraggingCam || e.touches.length !== 1) return;
+            const dx = e.touches[0].clientX - lastPointerX;
+            const dy = e.touches[0].clientY - lastPointerY;
+            camYaw -= dx * 0.007;
+            camPitch = Math.max(0.15, Math.min(1.05, camPitch + dy * 0.007));
+            lastPointerX = e.touches[0].clientX;
+            lastPointerY = e.touches[0].clientY;
+        }, { passive: true });
+        canvas.addEventListener('touchend', () => { isDraggingCam = false; });
+
+        // ============================================================================
+        // 8. LOGIKA GAMEPLAY, CHECKPOINT & UMPAN BALIK
+        // ============================================================================
+        function showFeedbackToast(text, isSuccess) {
+            const toast = document.getElementById('feedback-toast');
+            const box = document.getElementById('feedback-box');
+            box.textContent = text;
+            box.className = `px-6 py-3 rounded-2xl font-bold text-white text-base sm:text-xl shadow-2xl border-2 border-white/40 text-center ${
+                isSuccess ? 'bg-emerald-500' : 'bg-rose-600'
+            }`;
+            toast.classList.remove('hidden');
+            toast.classList.remove('toast-anim');
+            void toast.offsetWidth; // Trigger reflow agar animasi ulang
+            toast.classList.add('toast-anim');
+        }
+
+        function updateHUD() {
+            const qData = QUESTIONS[Math.min(currentLevel, QUESTIONS.length - 1)];
+            document.getElementById('hud-level').textContent = Math.min(currentLevel + 1, 30);
+            document.getElementById('hud-score').textContent = score;
+            document.getElementById('hud-topic').textContent = qData.topic;
+            document.getElementById('hud-question').textContent = qData.q;
+
+            const diffBadge = document.getElementById('hud-difficulty');
+            diffBadge.textContent = qData.diff;
+            if (qData.diff === 'MUDAH') {
+                diffBadge.className = 'text-xs sm:text-sm font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
+            } else {
+                diffBadge.className = 'text-xs sm:text-sm font-bold px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/40';
+            }
+        }
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60).toString().padStart(2, '0');
+            const s = (sec % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function respawnAtCheckpoint() {
+            const zPos = -currentLevel * LEVEL_SPACING;
+            player.pos.set(0, 0.6, zPos);
+            player.vel.set(0, 0, 0);
+            player.rotY = Math.PI;
+            camYaw = 0;
+        }
+
+        function handleOptionLanding(tile) {
+            if (tile.triggered) return;
+            tile.triggered = true;
+
+            if (tile.isCorrect) {
+                // JAWABAN BENAR!
+                if (!levelAnswered) {
+                    levelAnswered = true;
+                    score += 100;
+                    correctCount++;
+                    updateHUD();
+                    playSound('correct');
+                    showFeedbackToast('BENAR! +100 Poin • Jembatan Terbuka!', true);
+                    spawnParticles(tile.mesh.position.x, 0.5, tile.mesh.position.z, 0x34d399, 30);
+                    spawnBridgeToNext(currentLevel, tile.mesh.position.x);
+                }
+            } else {
+                // JAWABAN SALAH! Platform berubah merah dan jatuh
+                wrongCount++;
+                score = Math.max(0, score - 25);
+                updateHUD();
+                playSound('wrong');
+                showFeedbackToast('UPS, JAWABAN KURANG TEPAT! (-25 Poin)', false);
+                spawnParticles(tile.mesh.position.x, 0.5, tile.mesh.position.z, 0xef4444, 20);
+
+                // Ubah warna semua sisi pijakan jadi merah gelap & jatuhkan
+                const redMat = new THREE.MeshLambertMaterial({ color: 0x991b1b });
+                tile.mesh.material = [redMat, redMat, redMat, redMat, redMat, redMat];
+                tile.falling = true;
+                tile.fallVel = -2;
+
+                // Hapus dari daftar pijakan solid sehingga pemain ikut jatuh lalu respawn
+                platforms = platforms.filter(p => p !== tile);
+                player.onGround = false;
+            }
+        }
+
+        function advanceToNextLevel() {
+            currentLevel++;
+            if (currentLevel >= QUESTIONS.length) {
+                // Semua 30 soal selesai!
+                finishGame();
+            } else {
+                levelAnswered = false;
+                updateHUD();
+                spawnLevelOptions(currentLevel);
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('hud-top').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            currentLevel = 0;
+            levelAnswered = false;
+            score = 0;
+            correctCount = 0;
+            wrongCount = 0;
+            elapsedSeconds = 0;
+            gameState = 'PLAYING';
+
+            buildCourseBase();
+            spawnLevelOptions(0);
+            respawnAtCheckpoint();
+            updateHUD();
+
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('hud-timer').textContent = '00:00';
+            timerInterval = setInterval(() => {
+                if (gameState === 'PLAYING') {
+                    elapsedSeconds++;
+                    document.getElementById('hud-timer').textContent = formatTime(elapsedSeconds);
+                }
+            }, 1000);
+        }
+
+        function finishGame() {
+            gameState = 'FINISHED';
+            clearInterval(timerInterval);
+            playSound('win');
+            spawnParticles(player.pos.x, player.pos.y + 2, player.pos.z, 0xfacc15, 60);
+
+            // Tentukan Peringkat Roblox berdasarkan skor
+            let rankTitle = 'Pemula Obby Matematika';
+            if (score >= 2800) rankTitle = '👑 Master Matematika Roblox!';
+            else if (score >= 2200) rankTitle = '🌟 Juara Obby Bilangan Cacah!';
+            else if (score >= 1500) rankTitle = '🚀 Penjelajah Matematika Hebat!';
+
+            document.getElementById('final-rank').textContent = rankTitle;
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-time').textContent = formatTime(elapsedSeconds);
+            document.getElementById('final-correct').textContent = `${correctCount} / 30`;
+            document.getElementById('final-wrong').textContent = wrongCount;
+
+            setTimeout(() => {
+                document.getElementById('hud-top').classList.add('hidden');
+                document.getElementById('touch-controls').classList.add('hidden');
+                document.getElementById('end-screen').classList.remove('hidden');
+            }, 900);
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        // ============================================================================
+        // 9. LOOP ANIMASI UTAMA (FISIKA, TABRAKAN, ANIMASI AVATAR & KAMERA)
+        // ============================================================================
+        const clock = new THREE.Clock();
+
+        function updatePhysics(dt) {
+            // Animasi platform salah yang jatuh ke bawah
+            optionTiles.forEach(tile => {
+                if (tile.falling) {
+                    tile.fallVel -= 25 * dt;
+                    tile.mesh.position.y += tile.fallVel * dt;
+                    tile.mesh.rotation.x += 1.5 * dt;
+                }
+            });
+
+            // Animasi partikel konfeti
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.vy -= 22 * dt;
+                p.mesh.position.x += p.vx * dt;
+                p.mesh.position.y += p.vy * dt;
+                p.mesh.position.z += p.vz * dt;
+                p.life -= 1.1 * dt;
+                p.mesh.scale.setScalar(Math.max(0.01, p.life));
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+
+            if (gameState !== 'PLAYING') return;
+
+            // Hitung arah gerak relatif terhadap kamera (camYaw)
+            let moveForward = 0;
+            let moveRight = 0;
+            if (keys.up) moveForward += 1;
+            if (keys.down) moveForward -= 1;
+            if (keys.right) moveRight += 1;
+            if (keys.left) moveRight -= 1;
+
+            const forwardVec = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+            const rightVec = new THREE.Vector3(Math.cos(camYaw), 0, -Math.sin(camYaw));
+
+            const moveDir = new THREE.Vector3()
+                .addScaledVector(forwardVec, moveForward)
+                .addScaledVector(rightVec, moveRight);
+
+            if (moveDir.lengthSq() > 0) {
+                moveDir.normalize();
+                player.vel.x = moveDir.x * player.speed;
+                player.vel.z = moveDir.z * player.speed;
+
+                // Putar karakter menghadap arah jalan
+                const targetAngle = Math.atan2(moveDir.x, moveDir.z);
+                player.rotY = targetAngle;
+
+                // Animasi ayunan tangan & kaki khas Roblox
+                player.walkCycle += dt * 14;
+                const swing = Math.sin(player.walkCycle) * 0.65;
+                leftLeg.rotation.x = swing;
+                rightLeg.rotation.x = -swing;
+                leftArm.rotation.x = -swing;
+                rightArm.rotation.x = swing;
+            } else {
+                player.vel.x *= 0.78;
+                player.vel.z *= 0.78;
+                leftLeg.rotation.x = 0;
+                rightLeg.rotation.x = 0;
+                leftArm.rotation.x = 0;
+                rightArm.rotation.x = 0;
+            }
+
+            // Gravitasi
+            player.vel.y += player.gravity * dt;
+
+            // Integrasi posisi
+            const prevY = player.pos.y;
+            player.pos.x += player.vel.x * dt;
+            player.pos.z += player.vel.z * dt;
+            player.pos.y += player.vel.y * dt;
+
+            // Cek tabrakan vertikal dengan semua platform
+            player.onGround = false;
+            const pRadius = 0.42;
+
+            for (let i = 0; i < platforms.length; i++) {
+                const plat = platforms[i];
+                const withinX = (player.pos.x + pRadius > plat.minX) && (player.pos.x - pRadius < plat.maxX);
+                const withinZ = (player.pos.z + pRadius > plat.minZ) && (player.pos.z - pRadius < plat.maxZ);
+
+                if (withinX && withinZ) {
+                    // Mendarat di atas permukaan platform
+                    if (player.vel.y <= 0 && prevY >= plat.topY - 0.25 && player.pos.y <= plat.topY + 0.05) {
+                        player.pos.y = plat.topY;
+                        player.vel.y = 0;
+                        player.onGround = true;
+
+                        // Jika menginjak platform jawaban A/B/C/D
+                        if (plat.type === 'option') {
+                            handleOptionLanding(plat);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Cek apakah pemain sudah mencapai Pos Checkpoint berikutnya setelah jembatan terbuka
+            if (levelAnswered) {
+                const nextZ = -(currentLevel + 1) * LEVEL_SPACING;
+                if (player.pos.z <= nextZ + 3.2 && player.onGround) {
+                    advanceToNextLevel();
+                }
+            }
+
+            // Jika pemain terjatuh ke jurang awan (y < -9), kembalikan ke checkpoint level ini
+            if (player.pos.y < -9) {
+                playSound('wrong');
+                respawnAtCheckpoint();
+            }
+
+            // Perbarui transformasi mesh avatar
+            playerGroup.position.copy(player.pos);
+            playerGroup.rotation.y = player.rotY;
+        }
+
+        function updateCamera() {
+            const camDist = 11.5;
+            const targetFocus = new THREE.Vector3(player.pos.x, player.pos.y + 2.2, player.pos.z - 1.5);
+
+            const offsetX = Math.sin(camYaw) * Math.cos(camPitch) * camDist;
+            const offsetY = Math.sin(camPitch) * camDist + 1.5;
+            const offsetZ = Math.cos(camYaw) * Math.cos(camPitch) * camDist;
+
+            const desiredCamPos = new THREE.Vector3(
+                targetFocus.x + offsetX,
+                targetFocus.y + offsetY,
+                targetFocus.z + offsetZ
+            );
+
+            camera.position.lerp(desiredCamPos, 0.14);
+            camera.lookAt(targetFocus);
+
+            // Arahkan bayangan matahari mengikuti pemain agar tetap tajam
+            dirLight.position.set(player.pos.x + 20, 45, player.pos.z + 20);
+            dirLight.target.position.copy(player.pos);
+            dirLight.target.updateMatrixWorld();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+            updatePhysics(dt);
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+
+        // Responsif saat ukuran layar berubah
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Mulai render latar 3D sejak awal halaman dimuat
+        window.onload = function () {
+            buildCourseBase();
+            spawnLevelOptions(0);
+            playerGroup.position.set(0, 0, 0);
+            animate();
+        };
+    </script>
+</body>
+</html>
